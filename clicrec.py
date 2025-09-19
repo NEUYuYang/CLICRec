@@ -200,7 +200,7 @@ class CLICRec(SequentialRecommender):
     def get_linkPre_loss_long(self, user, item_seq, item_seq_len):
         '''More details will be made public after the paper is published.'''
         y = torch.cat((torch.ones((edge_index_pos.shape[1], 1)),
-                       torch.zeros((edge_index_neg_selected.shape[1], 1))), dim=0)  # 将所有y值设置为1,0
+                       torch.zeros((edge_index_neg_selected.shape[1], 1))), dim=0)  
         edge_index = edge_index.to(self.device)
         edge_index_pos = edge_index_pos.to(self.device)
         edge_index_neg_selected = edge_index_neg_selected.to(self.device)
@@ -221,10 +221,8 @@ class CLICRec(SequentialRecommender):
         x = F.relu(self.gat_conv1(x, edge_index, edge_weight))
         x = F.relu(self.gat_conv2(x, edge_index, edge_weight))
         self.nodeLong = x
-        # 按照边的顺序将节点特征向量重新排列
         edg_index_all = torch.cat((edge_index_pos, edge_index_neg), dim=1)
-        Em, Ed = self.pro_data(x, edg_index_all)  # 筛选数据 获得源节点特征和目标节点
-        # 将源节点特征和目标节点特征拼接起来
+        Em, Ed = self.pro_data(x, edg_index_all) 
         x = torch.cat((Em, Ed), dim=1)
         x = self.fc(x)
         return x
@@ -232,20 +230,17 @@ class CLICRec(SequentialRecommender):
     def pro_data(self, x, edg_index):
         m_index = edg_index[0]
         d_index = edg_index[1]
-        Em = torch.index_select(x, 0, m_index)  # 沿着x1的第0维选出m_index
+        Em = torch.index_select(x, 0, m_index)  
         Ed = torch.index_select(x, 0, d_index)
         return Em, Ed
 
     def get_long_cl_loss(self, user, utl, n_clusters, random_state, n_init):
         user_emb = self.nodeLong[:len(user)]
-        # 将user_emb转换为numpy数组进行K-means聚类
         user_emb_np = user_emb.detach().cpu().numpy()
         kmeans = KMeans(n_clusters=n_clusters, random_state=random_state, n_init=n_init)
         cluster_labels = kmeans.fit_predict(user_emb_np)
         cluster_centers = torch.from_numpy(kmeans.cluster_centers_).to(user_emb.device).float()
-        # 转换为tensor
         cluster_labels = torch.from_numpy(cluster_labels).to(user_emb.device)
-        # 获取每个样本对应的正样本类簇中心
         pos_cluster_centers = cluster_centers[cluster_labels]  # (batch_size, hidden_size)
         self.pos_cluster_centers_long = pos_cluster_centers
         cl_loss = self.LCLInfoNCE_loss(utl, pos_cluster_centers, cluster_centers)
@@ -268,10 +263,8 @@ class CLICRec(SequentialRecommender):
 
     def linkPreShort(self, x, edge_index_pos, edge_index_neg, edge_weight=None):
         self.nodeShort = x
-        # 按照边的顺序将节点特征向量重新排列
         edg_index_all = torch.cat((edge_index_pos, edge_index_neg), dim=1)
-        Em, Ed = self.pro_data(x, edg_index_all)  # 筛选数据 获得源节点特征和目标节点
-        # 将源节点特征和目标节点特征拼接起来
+        Em, Ed = self.pro_data(x, edg_index_all) 
         x = torch.cat((Em, Ed), dim=1)
         x = self.fc(x)
         return x
@@ -323,18 +316,16 @@ class CLICRec(SequentialRecommender):
         edge_index_pos3 = torch.tensor(edge_index_pos3, dtype=torch.long)
         edge_index3 = to_undirected(edge_index_pos3)
 
-        # 获取不相关连接 为了构建训练数据
         edge_index_neg3 = np.row_stack(np.argwhere(adjacency_matrix3[:len(user)] == 0))
         edge_index_neg3[1, :] += adjacency_matrix3.shape[0]
         edge_index_neg3 = torch.tensor(edge_index_neg3, dtype=torch.long)
 
-        # 获取平衡样本
         num_pos_edges_number = edge_index_pos3.shape[1]
         selected_neg_edge_indices = torch.randint(high=edge_index_neg3.shape[1], size=(num_pos_edges_number,),
                                                   dtype=torch.long)
         edge_index_neg_selected = edge_index_neg3[:, selected_neg_edge_indices]
         y = torch.cat((torch.ones((edge_index_pos3.shape[1], 1)),
-                       torch.zeros((edge_index_neg_selected.shape[1], 1))), dim=0)  # 将所有y值设置为1,0
+                       torch.zeros((edge_index_neg_selected.shape[1], 1))), dim=0)  
         user_emb = self.user_embedding(user)
         if len(user) < self.batch_size:
             last_row = user_emb[-1, :]
